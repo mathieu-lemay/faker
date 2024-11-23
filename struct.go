@@ -1,6 +1,7 @@
 package faker
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 )
@@ -8,6 +9,14 @@ import (
 // Struct is a faker struct for Struct
 type Struct struct {
 	Faker *Faker
+}
+
+type fakerFunction func() interface{}
+
+var functions = map[string]fakerFunction{}
+
+func RegisterFunction(name string, function fakerFunction) {
+	functions[fmt.Sprintf("fn=%s", name)] = function
 }
 
 // Fill elements of a struct with random data
@@ -45,6 +54,11 @@ func (s Struct) rStruct(t reflect.Type, v reflect.Value) {
 		if ok && t == "skip" {
 			// Do nothing, skip it
 		} else if elementV.CanSet() {
+			// Try to set with a dynamic value
+			if ok := s.rDyn(elementT.Type, elementV, t); ok {
+				continue
+			}
+
 			// Check if fakesize is set
 			size := -1 // Set to -1 to indicate fakesize was not set
 			fs, ok := elementT.Tag.Lookup("fakesize")
@@ -187,4 +201,24 @@ func (s Struct) rFloat(t reflect.Type, v reflect.Value, function string) {
 
 func (s Struct) rBool(_ reflect.Type, v reflect.Value) {
 	v.SetBool(s.Faker.Bool())
+}
+
+func (s Struct) rDyn(t reflect.Type, v reflect.Value, function string) bool {
+	f, ok := functions[function]
+
+	if !ok {
+		return false
+	}
+
+	val := f()
+	vType := reflect.TypeOf(val)
+
+	if !vType.AssignableTo(t) {
+		return false
+	}
+
+	vVal := reflect.ValueOf(val)
+	v.Set(vVal)
+	return true
+
 }

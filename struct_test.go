@@ -36,6 +36,23 @@ type Function struct {
 	Const  *string `fake:"ABC"`
 }
 
+type Dynamic struct {
+	String string   `fake:"fn=dyn_string"`
+	Int    int      `fake:"fn=dyn_int"`
+	UInt   uint     `fake:"fn=dyn_uint"`
+	Float  float64  `fake:"fn=dyn_float"`
+	Bool   bool     `fake:"fn=dyn_bool"`
+	Slice  []string `fake:"fn=dyn_slice"`
+	Struct struct {
+		String string
+		Int    int
+	} `fake:"fn=dyn_struct"`
+	Recursive struct {
+		String string `fake:"fn=dyn_string"`
+		Int    int    `fake:"fn=dyn_int"`
+	}
+}
+
 type StructArray struct {
 	Bars      []*Basic
 	Builds    []BuiltIn
@@ -91,6 +108,38 @@ func TestStructWithFunction(t *testing.T) {
 	NotExpect(t, "", function.Number)
 	NotExpect(t, "", function.Name)
 	NotExpect(t, "ABC", function.Const)
+}
+
+func TestStructWithDynamic(t *testing.T) {
+	var dynamic Dynamic
+
+	RegisterFunction("dyn_string", func() interface{} { return "a-string" })
+	RegisterFunction("dyn_int", func() interface{} { return -123 })
+	RegisterFunction("dyn_uint", func() interface{} { return uint(456) })
+	RegisterFunction("dyn_float", func() interface{} { return float64(1.234) })
+	RegisterFunction("dyn_bool", func() interface{} { return true })
+	RegisterFunction("dyn_slice", func() interface{} { return []string{"a", "b"} })
+	RegisterFunction("dyn_struct", func() interface{} {
+		return struct {
+			String string
+			Int    int
+		}{"other-string", 789}
+	})
+
+	New().Struct().Fill(&dynamic)
+	Expect(t, "a-string", dynamic.String)
+	Expect(t, -123, dynamic.Int)
+	Expect(t, uint(456), dynamic.UInt)
+	Expect(t, 1.234, dynamic.Float)
+	Expect(t, true, dynamic.Bool)
+	Expect(t, "a", dynamic.Slice[0])
+	Expect(t, "b", dynamic.Slice[1])
+
+	Expect(t, "other-string", dynamic.Struct.String)
+	Expect(t, 789, dynamic.Struct.Int)
+
+	Expect(t, "a-string", dynamic.Recursive.String)
+	Expect(t, -123, dynamic.Recursive.Int)
 }
 
 func TestStructArray(t *testing.T) {
